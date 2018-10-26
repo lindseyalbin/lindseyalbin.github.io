@@ -1,0 +1,398 @@
+<html>
+<head>
+	<title>SuperMario!</title>
+	<meta charset="UTF-8"/>
+</head>
+<body>
+<br>
+<canvas id="myCanvas" width="1000" height="600" style="border:1px solid #cccccc;"></canvas>
+
+<script type="text/javascript">
+
+function Sprite(x, y, w, h, update_method, type)
+{
+	this.x = x;
+	this.y = y;
+	this.w = w;
+	this.h = h;
+	this.prev_x = 0;
+	this.prev_y= 0;
+	this.vert_velocity = 0;
+	this.type = type;
+	this.frame = 0;
+	this.counter = 0;
+	this.mvmt_direction = 3;
+	this.update = update_method;
+	this.dist_from_left = 100;
+}
+
+Sprite.prototype.jump = function()
+{
+	this.y -= 5;
+	this.vert_velocity = -40;
+}
+
+Sprite.prototype.remember_state = function()
+{
+	this.prev_x = this.x;
+	this.prev_y = this.y;
+}
+
+Sprite.prototype.sit_still = function()
+{
+	
+}
+
+Sprite.prototype.mario_update = function()
+{
+	this.vert_velocity += 4;
+	this.y += this.vert_velocity;
+	
+	if(this.y > 500 - this.h)
+	{
+		this.vert_velocity = 0.0;
+		this.y = 500 - this.h;
+	}
+			
+	this.counter++;
+	if(this.y == 500 - this.h)
+		this.counter = 0;
+}
+
+Sprite.prototype.fireball_update = function()
+{
+	this.vert_velocity += 4;
+	this.y += this.vert_velocity;
+	if(this.y > 500 - this.h)
+	{
+		this.vert_velocity = -20;
+		this.y = 500 - this.h;
+	}
+	this.x += this.mvmt_direction;
+	this.counter++;
+}
+
+Sprite.prototype.goomba_update = function()
+{
+	this.vert_velocity += 3.5;
+	this.y += this.vert_velocity;
+		
+	if(this.y > 500 - this.h)
+	{
+		this.vert_velocity = 0.0;
+		this.y = 500 - this.h;
+	}
+		
+	this.x += this.mvmt_direction;
+		
+	if(this.frame == 1)
+		this.counter++;
+}
+
+function Model()
+{
+	this.sprites = [];
+	
+	this.sprites.push(new Sprite(200, 400, 55, 400, Sprite.prototype.sit_still, "tube"));
+//	this.sprites.push(new Sprite(300, 300, 55, 400, Sprite.prototype.sit_still, "tube"));
+	this.sprites.push(new Sprite(500, 300, 55, 400, Sprite.prototype.sit_still, "tube"));
+	this.sprites.push(new Sprite(800, 200, 55, 400, Sprite.prototype.sit_still, "tube"));
+	this.sprites.push(new Sprite(900, 400, 55, 400, Sprite.prototype.sit_still, "tube"));
+	
+	this.mario = new Sprite(100, 400, 60, 95, Sprite.prototype.mario_update, "mario");
+	this.sprites.push(this.mario);
+	
+	this.sprites.push(new Sprite(300, 300, 99, 118, Sprite.prototype.goomba_update, "goomba"));
+	this.sprites.push(new Sprite(600, 300, 99, 118, Sprite.prototype.goomba_update, "goomba"));
+	
+	this.sprites.push(new Sprite(500, 232, 56, 68, Sprite.prototype.sit_still, "coin"));
+	this.sprites.push(new Sprite(800, 132, 56, 68, Sprite.prototype.sit_still, "coin"));
+	this.sprites.push(new Sprite(900, 332, 56, 468, Sprite.prototype.sit_still, "coin"));
+	
+	this.scroll_pos = 0;
+
+}
+
+Model.prototype.update = function()
+{
+	for(let i = 0; i < this.sprites.length; i++)
+	{
+		let s1 = this.sprites[i];
+		for(let j = 0; j < this.sprites.length; j++)
+		{
+			let s2 = this.sprites[j];
+			if(s1.type == "tube")
+			{
+				if(s2.type == "mario")
+				{
+					//console.log(this.does_mario_collide(s2, s1));
+					if(this.does_collide(s2, s1))
+					{
+						this.get_out_of_sprite(s2, s1);
+					}
+					
+					if(s2.y == s1.y - s2.h - 1)
+						s2.counter = 0;
+				}
+				else if(s2.type == "goomba")
+				{
+					if(this.does_collide(s2, s1))
+					{
+						if(s2.mvmt_direction > 0)
+							s2.mvmt_direction = -3;
+						else
+							s2.mvmt_direction = 3;
+					}
+				}
+			}
+			else if(s1.type == "goomba")
+			{
+				if(s1.counter > 40)
+				{
+					this.sprites.splice(i, 1);
+					break;
+				}
+				if(s2.type == "fireball")
+				{
+					if(this.does_collide(s2, s1))
+					{
+						this.sprites.splice(j, 1);
+						s1.frame = 1;
+					}
+				}
+			}
+			else if(s1.type == "fireball")
+			{
+				if(s1.counter > 100)
+				{
+					this.sprites.splice(i, 1);
+					break;
+				}
+			}
+			else if(s1.type == "coin")
+			{
+				if(s2.type == "mario")
+				{
+					if(this.does_collide(s2, s1))
+					{
+						this.sprites.splice(i , 1);
+						break;
+					}
+				}
+			}
+		}
+		s1.update();
+	}
+}
+
+Model.prototype.get_out_of_sprite = function(m, s)
+{
+	//if he crossed the left side of the tube
+	if(m.x + m.w > s.x && m.prev_x + m.w <= s.x)
+	{
+		this.scroll_pos -= 5;
+		m.x = s.x - m.w - 1;
+	}	
+	//if he crossed the right side of the tube
+	else if(m.x < s.x + s.w && m.prev_x >= s.x + s.w)
+	{
+		this.scroll_pos += 5;
+		m.x = s.x + s.w + 1;
+	}
+	//if he crossed the top of the tube
+	else if(m.y + m.h >= s.y)
+	{
+		m.y = s.y - m.h - 1;
+		m.vert_velocity = 0;
+		console.log("crossed the top mannnn");
+	}
+			
+	//if he crossed the bottom of the tube
+	else if(m.y < s.y + s.h)
+		m.y = s.y + s.h + 1;
+}
+
+Model.prototype.does_collide = function(s1, s2)
+{
+	if(s1.x + s1.w < s2.x || s1.x > s2.x + s2.w ||s1.y > s2.y + s2.h)
+		return false;
+	if(s1.y + s1.h < s2.y)
+	{
+		return false;
+	}
+	console.log("top collision");
+	return true;
+}
+
+Model.prototype.add_fireball = function()
+{
+	let fireball;
+	if(this.mario.frame < 5)
+	{
+		fireball = new Sprite(this.mario.x + this.mario.w, this.mario.y + this.mario.h, 47, 47, Sprite.prototype.fireball_update, "fireball");
+		fireball.mvmt_direction = 6;
+	}
+	else
+	{
+		fireball = new Sprite(this.mario.x, this.mario.y + this.mario.h, 47, 47, Sprite.prototype.fireball_update, "fireball");
+		fireball.mvmt_direction = -6;
+	}
+	this.sprites.push(fireball);
+}
+
+function View(model)
+{
+	this.model = model;
+	this.canvas = document.getElementById("myCanvas");
+	this.tube_image = new Image();
+	this.tube_image.src = "tube.png";
+	this.mario_images = [];
+	for(let i = 0; i < 10; i++)
+	{
+		this.mario_images[i] = new Image();
+	}
+	this.mario_images[0].src = "mario1.png";
+	this.mario_images[1].src = "mario2.png";
+	this.mario_images[2].src = "mario3.png";
+	this.mario_images[3].src = "mario4.png";
+	this.mario_images[4].src = "mario5.png";
+	this.mario_images[5].src = "mariof1.png";
+	this.mario_images[6].src = "mariof2.png";
+	this.mario_images[7].src = "mariof3.png";
+	this.mario_images[8].src = "mariof4.png";
+	this.mario_images[9].src = "mariof5.png";
+	this.fireball_image = new Image();
+	this.fireball_image.src = "fireball.png";
+	this.goomba_images = [];
+	this.goomba_images[0] = new Image();
+	this.goomba_images[1] = new Image();
+	this.goomba_images[0].src = "goomba.png";
+	this.goomba_images[1].src = "goomba_fire.png";
+	this.coin_image = new Image();
+	this.coin_image.src = "coin.png";
+}
+
+View.prototype.update = function()
+{
+	let ctx = this.canvas.getContext("2d");
+	ctx.clearRect(0,0,1000,600);
+	ctx.moveTo(0,500);
+	ctx.lineTo(1000,500);
+	ctx.stroke();
+	ctx.fillStyle = "cyan";
+	ctx.fillRect(0,0,1000,500);
+	ctx.fillStyle = "lawngreen";
+	ctx.fillRect(0,501,1000,600);
+	for(let i = 0; i < this.model.sprites.length; i++)
+	{
+		let sprite = this.model.sprites[i];
+		if(sprite.type == "tube")
+		{
+			ctx.drawImage(this.tube_image, sprite.x - this.model.scroll_pos, sprite.y);
+		}
+		else if(sprite.type == "mario")
+			ctx.drawImage(this.mario_images[sprite.frame], sprite.x - this.model.scroll_pos, sprite.y);
+		else if(sprite.type == "fireball")
+			ctx.drawImage(this.fireball_image, sprite.x - this.model.scroll_pos, sprite.y);
+		else if(sprite.type == "goomba")
+			ctx.drawImage(this.goomba_images[sprite.frame], sprite.x - this.model.scroll_pos, sprite.y);
+		else if(sprite.type == "coin")
+			ctx.drawImage(this.coin_image, sprite.x - this.model.scroll_pos, sprite.y);
+	}
+}
+
+function Controller(model, view)
+{
+	this.model = model;
+	this.view = view;
+	this.key_right = false;
+	this.key_left = false;
+	this.key_up = false;
+	this.key_space = false;
+	this.key_control = false;
+	let self = this;
+	document.addEventListener('keydown', function(event) { self.keyDown(event); }, false);
+	document.addEventListener('keyup', function(event) { self.keyUp(event); }, false);
+}
+
+Controller.prototype.keyDown = function(event)
+{
+	if(event.keyCode == 39)
+		this.key_right = true;
+	else if(event.keyCode == 37)
+		this.key_left = true;
+	else if(event.keyCode == 38)
+		this.key_up = true;
+	else if(event.keyCode == 32)
+		this.key_space = true;
+	else if(event.keyCode == 17)
+		this.key_control = true;
+}
+
+Controller.prototype.keyUp = function(event)
+{
+	if(event.keyCode == 39)
+		this.key_right = false;
+	else if(event.keyCode == 37)
+		this.key_left = false;
+	else if(event.keyCode == 38)
+		this.key_up = false;
+	else if(event.keyCode == 32)
+		this.key_space = false;
+	else if(event.keyCode == 17)
+		this.key_control = false;
+}
+
+Controller.prototype.update = function()
+{
+	this.model.mario.remember_state();
+	if(this.key_right)
+	{
+		this.model.scroll_pos += 5;
+		this.model.mario.x += 5;
+		this.model.mario.frame++;
+		if(this.model.mario.frame > 4)
+			this.model.mario.frame = 0;
+	}
+	if(this.key_left)
+	{
+		this.model.scroll_pos -= 5;
+		this.model.mario.x -= 5;
+		if(this.model.mario.frame < 5)
+			this.model.mario.frame = 5;
+		this.model.mario.frame++;
+		if(this.model.mario.frame > 9)
+			this.model.mario.frame = 5;
+	}
+	if((this.key_up || this.key_space) && this.model.mario.counter < 5)
+	{
+		this.model.mario.jump();
+	}
+	if(this.key_control)
+	{
+		this.model.add_fireball();
+	}
+}
+
+
+function Game()
+{
+	this.model = new Model();
+	this.view = new View(this.model);
+	this.controller = new Controller(this.model, this.view);
+}
+
+Game.prototype.onTimer = function()
+{
+	this.controller.update();
+	this.model.update();
+	this.view.update();
+}
+
+let game = new Game();
+let timer = setInterval(function() { game.onTimer(); }, 40);
+
+</script>
+
+</body>
+</html>
